@@ -29,12 +29,14 @@ char *input_file_name = NULL;
 char *output_file_name = NULL;
 FILE *output_file_fd = NULL;
 int dst_port =0;
+int ts_step = 0; // timestamp step, 160 for amrnb, 320 for amrwb
 
 #define FT_Invalid 0xFFFF
 const unsigned short AmrBits[]={95,103,118,134,148,159,204,244,39,FT_Invalid,FT_Invalid,FT_Invalid,FT_Invalid,
                              FT_Invalid, FT_Invalid,0};
 const unsigned short AmrWBBits[]={132,177,253,285,317,365,397,461,477,40,FT_Invalid,FT_Invalid,FT_Invalid,
                              FT_Invalid, FT_Invalid,0};
+const unsigned char NODATA_FRAME = 0x7C;
 #define RTP_HEAD_LEN 12
 
 void help();
@@ -77,7 +79,7 @@ void write_single_byte_bits(char **to, const unsigned char **from, int *to_bit_o
 }
 
 void write_multi_bytes_bits(char *to, const unsigned char **from, int *to_bit_offset, int *from_bit_offset, int num_bit) {
-    printf("to_bit_offset %d, from_bit_offset %d, num_bit %d\n", *to_bit_offset, *from_bit_offset, num_bit);
+    //printf("to_bit_offset %d, from_bit_offset %d, num_bit %d\n", *to_bit_offset, *from_bit_offset, num_bit);
     int input_bit_remain = 0;
     while(num_bit > 0) {
         input_bit_remain = 8 - (*from_bit_offset);
@@ -110,6 +112,11 @@ void create_amr_file() {
 bool checkParams() {
     if(input_file_name == NULL) {
         printf("input file name needed,usage example\n");
+        help();
+        return false;
+    }
+    if(dst_port == 0) {
+        printf("need to set dstination port,usage example\n");
         help();
         return false;
     }
@@ -148,7 +155,7 @@ void write_AMR_BE_mode(const unsigned char *packet, unsigned int capture_len) {
     int to_bit_offset = 4;
     //hexDump(packet, 32);
     write_multi_bytes_bits(&cmr, &packet, &to_bit_offset, &from_bit_offset, 4);
-    printf("cmr %x\n", cmr);
+    //printf("cmr %x\n", cmr);
     to_bit_offset = 2;
     write_multi_bytes_bits(&ft,  &packet, &to_bit_offset, &from_bit_offset, 6);
     if(ft & (1<<5)) {
@@ -156,7 +163,7 @@ void write_AMR_BE_mode(const unsigned char *packet, unsigned int capture_len) {
         assert(0);
     }
     ft = (ft>>1);
-    printf("ft %x\n", ft);
+    //printf("ft %x\n", ft);
     
     if(is_amr_wb) {
         assert(ft >= 0 && ft <= 9);
@@ -241,12 +248,20 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
     static struct timeval last_time;
     static unsigned int last_ssrc = 0;
     static unsigned short last_sequence = 0;
+    static unsigned int last_timestamp = 0;
     unsigned int ssrc = ntohl(*(unsigned int *)(rtp_packet+8));
     unsigned int timestamp = ntohl(*(unsigned int *)(rtp_packet+4));
     unsigned short sequence = ntohs(*(unsigned short *)(rtp_packet+2));
-    printf("sequence=%u, timestamp %u\n", sequence, timestamp);
+    printf("%s sequence=%u, timestamp %u\r", __FUNCTION__, sequence, timestamp);
+    if(last_ssrc == ssrc && last_sequence+1 == sequence && timestamp > last_timestamp + ts_step) {
+        // during SID period, timestamp maybe jump, need to insert nodata frame here
+        while(timestamp > last_timestamp + ts_step) {
+            fwrite(&NODATA_FRAME, 1, 1, output_file_fd);
+            last_timestamp += ts_step;
+        }
+    }
     if(is_oa_mode) {
-        write_AMR_BE_mode(rtp_packet+RTP_HEAD_LEN, capture_len-RTP_HEAD_LEN);
+        write_AMR_OA_mode(rtp_packet+RTP_HEAD_LEN, capture_len-RTP_HEAD_LEN);
     } else {
         write_AMR_BE_mode(rtp_packet+RTP_HEAD_LEN, capture_len-RTP_HEAD_LEN);
     }
@@ -318,6 +333,10 @@ int main(int argc, char *argv[]) {
     if(!checkParams()) {
         return;
     }
+    if(is_amr_wb)
+        ts_step = 320;
+    else 
+        ts_step = 160;
     create_amr_file();
 
     pcap = pcap_open_offline(input_file_name, errbuf);
@@ -331,7 +350,7 @@ int main(int argc, char *argv[]) {
      */
     while ((packet = pcap_next(pcap, &header)) != NULL)
         parse_UDP_packet(packet, header.ts, header.caplen);
-
+    printf("-------------------process complete!-------------------\n");
     fclose(output_file_fd);
     return 0;
 }

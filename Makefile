@@ -1,2 +1,2 @@
-extract_amr: *.c
-	gcc extract_amr.c -lpcap -o extract_amr
+a.out: *.c
+	gcc extract_amr.c -lpcap -o a.out

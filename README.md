@@ -1,7 +1,7 @@
 # amr-audio
-extract amr from pacp file and write to .amr file storage format
+extract amr frame from tcpdump file and write amr frame to .amr formatted file storage 
 
-compile environment:
+Compile environment:  
 linux
 
 executable usage:  

@@ -136,7 +136,7 @@ bool checkParams() {
         memcpy(&output_file_name[dot_index], ".amr", 5);
     }
     printf("input file %s\n", input_file_name);
-    printf("output file %s\n", input_file_name);
+    printf("output file %s\n", output_file_name);
     printf("is_amr_wb %d\n", is_amr_wb);
     printf("is_oa_mode %d\n", is_oa_mode);
     return true;
@@ -249,10 +249,15 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
     static unsigned int last_ssrc = 0;
     static unsigned short last_sequence = 0;
     static unsigned int last_timestamp = 0;
+    unsigned char rtp_version = *rtp_packet;
     unsigned int ssrc = ntohl(*(unsigned int *)(rtp_packet+8));
     unsigned int timestamp = ntohl(*(unsigned int *)(rtp_packet+4));
     unsigned short sequence = ntohs(*(unsigned short *)(rtp_packet+2));
-    printf("%s sequence=%u, timestamp %u\r", __FUNCTION__, sequence, timestamp);
+    if(rtp_version != 0x80) {
+        printf("%s error!\n", __FUNCTION__);
+        return;
+    }
+    printf("%s sequence=%u, timestamp %u\n", __FUNCTION__, sequence, timestamp);
     if(last_ssrc == ssrc && last_sequence+1 == sequence && timestamp > last_timestamp + ts_step) {
         // during SID period, timestamp maybe jump, need to insert nodata frame here
         while(timestamp > last_timestamp + ts_step) {

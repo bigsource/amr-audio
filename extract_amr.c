@@ -257,14 +257,23 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
         printf("%s error!\n", __FUNCTION__);
         return;
     }
-    printf("%s sequence=%u, timestamp %u\n", __FUNCTION__, sequence, timestamp);
-    if(last_ssrc == ssrc && last_sequence+1 == sequence && timestamp > last_timestamp + ts_step) {
-        // during SID period, timestamp maybe jump, need to insert nodata frame here
+    printf("%s sequence=%u, timestamp %u\r", __FUNCTION__, sequence, timestamp);
+    if(last_ssrc == ssrc) {
+        if(sequence <= last_sequence && (last_sequence - sequence < 1000))
+            return; // discard duplicate frame, older frame
+
+        // during SID period, timestamp maybe jump, need to insert nodata frame here.
+        // if frame lost in network, nodate frame also need to insert
+        if(timestamp > last_timestamp + ts_step)
+            printf("%s write nodata frame last_timestamp %d, timestamp %d\n", __FUNCTION__, last_timestamp, timestamp);
         while(timestamp > last_timestamp + ts_step) {
             fwrite(&NODATA_FRAME, 1, 1, output_file_fd);
             last_timestamp += ts_step;
         }
     }
+    last_ssrc = ssrc;
+    last_sequence = sequence;
+    last_timestamp = timestamp;
     if(is_oa_mode) {
         write_AMR_OA_mode(rtp_packet+RTP_HEAD_LEN, capture_len-RTP_HEAD_LEN);
     } else {

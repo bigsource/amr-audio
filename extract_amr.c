@@ -31,6 +31,8 @@ FILE *output_file_fd = NULL;
 int dst_port =0;
 int ts_step = 0; // timestamp step, 160 for amrnb, 320 for amrwb
 
+int frame_number = 0;
+
 #define FT_Invalid 0xFFFF
 const unsigned short AmrBits[]={95,103,118,134,148,159,204,244,39,FT_Invalid,FT_Invalid,FT_Invalid,FT_Invalid,
                              FT_Invalid, FT_Invalid,0};
@@ -269,11 +271,13 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
         while(timestamp > last_timestamp + ts_step) {
             fwrite(&NODATA_FRAME, 1, 1, output_file_fd);
             last_timestamp += ts_step;
+            frame_number++;
         }
     }
     last_ssrc = ssrc;
     last_sequence = sequence;
     last_timestamp = timestamp;
+    frame_number++;
     if(is_oa_mode) {
         write_AMR_OA_mode(rtp_packet+RTP_HEAD_LEN, capture_len-RTP_HEAD_LEN);
     } else {
@@ -364,6 +368,7 @@ int main(int argc, char *argv[]) {
      */
     while ((packet = pcap_next(pcap, &header)) != NULL)
         parse_UDP_packet(packet, header.ts, header.caplen);
+    printf("total frames %d\n", frame_number);
     printf("-------------------process complete!-------------------\n");
     fclose(output_file_fd);
     return 0;

@@ -168,10 +168,18 @@ void write_AMR_BE_mode(const unsigned char *packet, unsigned int capture_len) {
     //printf("ft %x\n", ft);
     
     if(is_amr_wb) {
-        assert(ft >= 0 && ft <= 9);
+        //assert(ft >= 0 && ft <= 9);
+        if(ft < 0 || ft > 9) {
+            printf("amrwb frame ft eror %d\n", ft);
+            return;
+        }
         amr_len = (AmrWBBits[ft] + 7)/8;
     } else {
-        assert(ft >= 0 && ft <= 8);
+        //assert(ft >= 0 && ft <= 8);
+        if(ft < 0 || ft > 8) {
+            printf("amrnb frame ft eror %d\n", ft);
+            return;
+        }
         amr_len = (AmrBits[ft] + 7)/8;
     }
     to_bit_offset = 0;
@@ -259,7 +267,7 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
         printf("%s error!\n", __FUNCTION__);
         return;
     }
-    printf("%s sequence=%u, timestamp %u\r", __FUNCTION__, sequence, timestamp);
+    printf("\r%s sequence=%u, timestamp %u", __FUNCTION__, sequence, timestamp);
     if(last_ssrc == ssrc) {
         if(sequence <= last_sequence && (last_sequence - sequence < 1000))
             return; // discard duplicate frame, older frame
@@ -267,7 +275,7 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
         // during SID period, timestamp maybe jump, need to insert nodata frame here.
         // if frame lost in network, nodate frame also need to insert
         if(timestamp > last_timestamp + ts_step)
-            printf("%s write nodata frame last_timestamp %d, timestamp %d\n", __FUNCTION__, last_timestamp, timestamp);
+            printf("\r%s write nodata frame last_timestamp %d, timestamp %d\n", __FUNCTION__, last_timestamp, timestamp);
         while(timestamp > last_timestamp + ts_step) {
             fwrite(&NODATA_FRAME, 1, 1, output_file_fd);
             last_timestamp += ts_step;

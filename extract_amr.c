@@ -28,7 +28,8 @@ bool is_oa_mode = false;
 char *input_file_name = NULL;
 char *output_file_name = NULL;
 FILE *output_file_fd = NULL;
-int dst_port =0;
+int rtp_ssrc =0;
+int dst_port = 0;
 int ts_step = 0; // timestamp step, 160 for amrnb, 320 for amrwb
 
 int frame_number = 0;
@@ -117,8 +118,8 @@ bool checkParams() {
         help();
         return false;
     }
-    if(dst_port == 0) {
-        printf("need to set dstination port,usage example\n");
+    if(rtp_ssrc == 0) {
+        printf("need to set ssrc,usage example\n");
         help();
         return false;
     }
@@ -268,6 +269,9 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
         return;
     }
     printf("\r%s sequence=%u, timestamp %u", __FUNCTION__, sequence, timestamp);
+    if(ssrc != rtp_ssrc) {
+        return;
+    }
     if(last_ssrc == ssrc) {
         if(sequence <= last_sequence && (last_sequence - sequence < 1000))
             return; // discard duplicate frame, older frame
@@ -298,11 +302,12 @@ void help() {
     printf("---------command for usage ---------\n");
     printf("-h (optional) get help information\n");
     printf("-i (mandatory) set input pcap file name to analyse\n");
+    printf("-s (mandatory) select rtp.ssrc for analyse\n");
     printf("-o (optional) set output pcap file name to analyse\n");
     printf("-w (optional) set for amr-wb codec. amr-nb codec if not set\n");
     printf("-a (optional) set for Octet-Aligned, Bandwidth-Efficient if not set\n");
     printf("-d (optional) set destination port to extract, else all port would be extracted\n");
-    printf("example 1: ./extract_amr.out -i exported_tr.pcap\n");
+    printf("example 1: ./extract_amr.out -i exported_tr.pcap -s 0x12345678\n");
     printf("example 2: ./extract_amr.out -i exported_tr.pcap -w -a\n");
     printf("------------------------------------\n");
     return;
@@ -319,7 +324,7 @@ int main(int argc, char *argv[]) {
         help();
         return;
     }
-    while((opt = getopt(argc, argv, ":i:o:d:hwa")) != -1) {
+    while((opt = getopt(argc, argv, ":i:o:s:hdwa")) != -1) {
         switch(opt) {
         case 'i':
             str_len = strlen(optarg) + 1;
@@ -343,9 +348,13 @@ int main(int argc, char *argv[]) {
             is_oa_mode = true;
             printf("is_oa_mode %d\n", is_oa_mode);
             break;
+        case 's':
+            rtp_ssrc = strtol(optarg, 0, 16);
+            printf("ssrc 0x%x\n", rtp_ssrc);
+            break;
         case 'd':
             dst_port = atoi(optarg);
-            printf("dst_port %d\n", dst_port);
+            printf("dst port %d\n", dst_port);
             break;
         case 'h':
             help();

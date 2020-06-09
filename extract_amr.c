@@ -109,6 +109,7 @@ void create_amr_file() {
     } else {
         fprintf(output_file_fd, "#!AMR\n");
     }
+    printf("%s succeed\n", __FUNCTION__);
     return;
 }
 
@@ -207,6 +208,7 @@ void parse_UDP_packet(const unsigned char *packet, struct timeval ts, unsigned i
     struct UDP_hdr *udp;
     unsigned int IP_header_length;
     /* For simplicity, we assume Ethernet encapsulation. */
+    //printf("%s, capture_len %d\n", __FUNCTION__, capture_len);
 
     if (capture_len < sizeof(struct ether_header))
     {
@@ -245,7 +247,7 @@ void parse_UDP_packet(const unsigned char *packet, struct timeval ts, unsigned i
     if(dst_port != 0 && ntohs(udp->uh_dport) != dst_port)
         return;
 
-    /*printf("%s src_port=%d dst_port=%d,",
+    /*printf("%s src_port=%d dst_port=%d\n",
         timestamp_string(ts),
         ntohs(udp->uh_sport),
         ntohs(udp->uh_dport));*/
@@ -255,6 +257,7 @@ void parse_UDP_packet(const unsigned char *packet, struct timeval ts, unsigned i
 }
 
 void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsigned int capture_len) {
+    //printf("%s, capture_len %d\n", __FUNCTION__, capture_len);
     assert(capture_len > RTP_HEAD_LEN);
     static struct timeval last_time;
     static unsigned int last_ssrc = 0;
@@ -268,13 +271,17 @@ void parse_RTP_packet(const unsigned char *rtp_packet, struct timeval ts, unsign
         printf("%s error!\n", __FUNCTION__);
         return;
     }
-    printf("\r%s sequence=%u, timestamp %u", __FUNCTION__, sequence, timestamp);
+    
     if(ssrc != rtp_ssrc) {
         return;
     }
+    //printf("%s\n", timestamp_string(ts));
+    printf("%s sequence=%u, timestamp %u\n", __FUNCTION__, sequence, timestamp);
     if(last_ssrc == ssrc) {
-        if(sequence <= last_sequence && (last_sequence - sequence < 1000))
-            return; // discard duplicate frame, older frame
+        if(sequence <= last_sequence && (last_sequence - sequence < 1000)) {
+            printf("%s discard sequence=%u\n", __FUNCTION__, sequence);
+            //return; // discard duplicate frame, older frame
+        }
 
         // during SID period, timestamp maybe jump, need to insert nodata frame here.
         // if frame lost in network, nodate frame also need to insert
@@ -324,7 +331,7 @@ int main(int argc, char *argv[]) {
         help();
         return;
     }
-    while((opt = getopt(argc, argv, ":i:o:s:hdwa")) != -1) {
+    while((opt = getopt(argc, argv, ":i:o:s:d:hwa")) != -1) {
         switch(opt) {
         case 'i':
             str_len = strlen(optarg) + 1;

@@ -42,6 +42,8 @@ const unsigned short AmrWBBits[]={132,177,253,285,317,365,397,461,477,40,FT_Inva
 const unsigned char NODATA_FRAME = 0x7C;
 #define RTP_HEAD_LEN 12
 
+#define PROTOCOL_UDP 17
+
 void help();
 void hexDump(const void *addr, int len);
 
@@ -221,6 +223,7 @@ void parse_UDP_packet(const unsigned char *packet, struct timeval ts, unsigned i
     /* Skip over the Ethernet header. */
     packet += sizeof(struct ether_header);
     capture_len -= sizeof(struct ether_header);
+    int ip_protocol = 0;
     
     ip = (struct ip*) packet;
     ip6 = (struct ip6_hdr*) packet;
@@ -230,6 +233,7 @@ void parse_UDP_packet(const unsigned char *packet, struct timeval ts, unsigned i
             return;
         }
         IP_header_length = sizeof(struct ip);
+        ip_protocol = ip->ip_p;
         
     } else if(ip->ip_v == 6) {
         if (capture_len < sizeof(struct ip6_hdr)) {
@@ -237,8 +241,11 @@ void parse_UDP_packet(const unsigned char *packet, struct timeval ts, unsigned i
             return;
         }
         IP_header_length = sizeof(struct ip6_hdr);
+        ip_protocol = ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
     }
     /* Skip over the IP header to get to the UDP header. */
+    if(ip_protocol != PROTOCOL_UDP)
+        return;
     packet += IP_header_length;
     capture_len -= IP_header_length;
 
